@@ -1,9 +1,27 @@
+import sys
 import io,os
 import nibabel as nib
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
+from datetime import date
+
+# Make sure call main_2.py with the parameter alpha, beta, epochs, lr
+if len(sys.argv) != 5:
+    print("Usage: python main_2.py <alpha> <beta> <epochs> <lr>")
+    sys.exit(1)
+
+# Get parameter from BATCH and transfer it to float point
+alpha_val = float(sys.argv[1])
+beta_val = float(sys.argv[2])
+epochs_val = int(sys.argv[3])
+lr_val = float(sys.argv[4])
+today = date.today().strftime("%Y%m%d")
+
+# Naming the model file with the loss function parameter alpha, beta, epochs, lr and date
+best_model_path = f"Unet3D_A{alpha_val}_B{beta_val}_E{epochs_val}_LR{lr_val}_{today}.pt"
+print(f"model name : {best_model_path}")
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -142,14 +160,16 @@ class TverskyLoss(nn.Module):
 
 
 # Optimizer
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+#optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=lr_val)
 writer = SummaryWriter()
 
 
-num_epochs = 20
+#num_epochs = 1
+num_epochs = epochs_val
 best_dice = 0.0
 
-best_model_path = 'best_unet3d_model_20241007_2.pt'
+#best_model_path = 'best_unet3d_model_20241007_2.pt'
 
 for epoch in range(num_epochs):
     model.train()
@@ -164,7 +184,8 @@ for epoch in range(num_epochs):
         if outputs.shape != masks.shape:
             masks = F.interpolate(masks, size=outputs.shape[2:], mode='nearest')
             
-        criterion = TverskyLoss(alpha=0.9, beta=0.9)
+#       criterion = TverskyLoss(alpha=0.9, beta=0.9)
+        criterion = TverskyLoss(alpha=alpha_val, beta=beta_val)
         loss = criterion(outputs, masks)
         
         # loss = dice_loss(outputs, masks)
