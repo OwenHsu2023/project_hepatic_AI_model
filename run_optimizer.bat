@@ -1,8 +1,8 @@
 @echo off
 setlocal enabledelayedexpansion
 
-set epoch=40
-set lr=0.001
+set epoch=1
+set lr=0.0001
 
 for /l %%a in (3,-1,3) do (
     set /a alpha=%%a
@@ -13,7 +13,7 @@ for /l %%a in (3,-1,3) do (
         set beta=0.!beta!
         
         echo Running with alpha=!alpha!, beta=!beta!, epoch=%epoch%, lr=%lr%
-        c:/Users/USER2024/project_hepatic_AI_model/.venv/Scripts/python.exe main_2.py !alpha! !beta! %epoch% %lr%
+        c:/Users/USER2024/project_hepatic_AI_model/.venv/Scripts/python.exe optimizer.py !alpha! !beta! %epoch% %lr%
         
         echo.
     )
