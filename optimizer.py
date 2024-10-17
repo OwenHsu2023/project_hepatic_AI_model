@@ -5,11 +5,12 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-from datetime import date
+from datetime import date, datetime
+import csv
 
-# Make sure call main_2.py with the parameter alpha, beta, epochs, lr
-if len(sys.argv) != 5:
-    print("Usage: python main_2.py <alpha> <beta> <epochs> <lr>")
+# Make sure call optimizer.py with the parameter alpha, beta, epochs, lr, start datetime
+if len(sys.argv) != 6:
+    print("Usage: python optimizer.py <alpha> <beta> <epochs> <lr> <datetime>")
     sys.exit(1)
 
 # Get parameter from BATCH and transfer it to float point
@@ -17,11 +18,47 @@ alpha_val = float(sys.argv[1])
 beta_val = float(sys.argv[2])
 epochs_val = int(sys.argv[3])
 lr_val = float(sys.argv[4])
-today = date.today().strftime("%Y%m%d")
+CSVfiledate = str(sys.argv[5])
+current_datetime = datetime.now().strftime("%m%d_%H%M")
+print(f'alpha= {alpha_val} beta= {beta_val} epoch= {epochs_val} lr= {lr_val} date= {CSVfiledate}')
 
-# Naming the model file with the loss function parameter alpha, beta, epochs, lr and date
-best_model_path = f"Unet3D_A{alpha_val}_B{beta_val}_E{epochs_val}_LR{lr_val}_{today}.pt"
-print(f"model name : {best_model_path}")
+# Path setting
+#train_image_folder = os.path.join('dataset', 'train', 'images' )
+#train_mask_folder = os.path.join('dataset', 'train', 'masks' )
+#test_image_folder = os.path.join('dataset', 'test', 'images' )
+#test_mask_folder = os.path.join('dataset', 'test', 'masks' )
+
+train_image_folder = os.path.join('dataset', 'train_20241014_53cases', 'images' )
+train_mask_folder = os.path.join('dataset', 'train_20241014_53cases', 'masks' )
+test_image_folder = os.path.join('dataset', 'test_20241014_53cases', 'images' )
+test_mask_folder = os.path.join('dataset', 'test_20241014_53cases', 'masks' )
+# print( os.listdir(test_image_folder))
+
+
+
+#Naming CSV 
+CSV_filename =  f'dice_table_{CSVfiledate}.csv'
+
+# Open the CSV file in write mode
+CSVfile_exists = os.path.isfile(CSV_filename)
+CSVfile = open(CSV_filename, mode='a', newline='')
+CSVwriter = csv.writer(CSVfile)
+# Write the header
+if not CSVfile_exists:
+    CSVwriter.writerow([{train_image_folder}])
+    CSVwriter.writerow([{train_mask_folder}])
+    CSVwriter.writerow([{test_image_folder}])
+    CSVwriter.writerow([{test_mask_folder}])
+    CSVwriter.writerow(['alpha', 'beta', 'epoch', 'LR', 'Dice', 'Loss', 'Datetime'])
+
+# Check if temp model file exists
+temp_model_path = os.path.join('model', 'Unet3D_temp.pt')
+if os.path.exists(temp_model_path):
+    # If it exists, delete it
+    os.remove(temp_model_path)
+    print(f'old temp model {temp_model_path} has been deleted.')
+
+
 
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -45,14 +82,7 @@ tensor = tensor.to(device)
 print(f"Tensor device: {tensor.device}")
 
 
-# Path setting
 
-train_image_folder = os.path.join('dataset', 'train', 'images' )
-train_mask_folder = os.path.join('dataset', 'train', 'masks' )
-test_image_folder = os.path.join('dataset', 'test', 'images' )
-test_mask_folder = os.path.join('dataset', 'test', 'masks' )
-
-# print( os.listdir(test_image_folder))
 
 
 class MRIDataset(Dataset):
@@ -169,8 +199,6 @@ writer = SummaryWriter()
 num_epochs = epochs_val
 best_dice = 0.0
 
-#best_model_path = 'best_unet3d_model_20241007_2.pt'
-
 for epoch in range(num_epochs):
     model.train()
     epoch_loss = 0
@@ -217,8 +245,21 @@ for epoch in range(num_epochs):
     # Save the best model
     if avg_val_dice > best_dice:
         best_dice = avg_val_dice
-        torch.save(model.state_dict(), best_model_path)
+        torch.save(model.state_dict(), temp_model_path)
         print(f'Saved Best Model with Dice Score: {best_dice}')
+
+
+
+# Write the value to CSV file
+CSVwriter.writerow([alpha_val, beta_val, epochs_val, lr_val, best_dice, epoch_loss/len(train_loader), current_datetime])
+# Close the file
+CSVfile.close()
+
+# Naming the model file with dice_score, alpha, beta, epochs, lr and date
+#best_model_path = f"Unet3D_Dice={alpha_val}_A{alpha_val}_B{beta_val}_E{epochs_val}_LR{lr_val}_{current_datetime}.pt"
+best_model_path = os.path.join('model', f"Unet3D_Dice={round(best_dice,3)}_A{alpha_val}_B{beta_val}_E{epochs_val}_LR{lr_val}_{current_datetime}.pt" )
+os.rename(temp_model_path, best_model_path)
+print(f"model name : {best_model_path}")
 
 writer.close()
 
